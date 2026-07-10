@@ -25,6 +25,10 @@ app.use(cors({
 }));
 
 // API Endpoints
+app.get('/', (req, res) => {
+    res.status(200).send('Shopify-Whop Checkout Integration Gateway is running.');
+});
+
 app.post('/api/create-checkout', checkoutController.handleCreateCheckout);
 app.post('/api/whop-webhook', validateWebhook, webhookController.handleWebhook);
 

@@ -50,7 +50,7 @@ async function getCompanyId() {
                 .filter(id => id && typeof id === 'string' && id.startsWith('plan_'));
         }
     } catch (err) {
-        console.error('Failed to parse plan IDs from product mappings:', err.message);
+        console.error('Failed to parse plan IDs from product mappings: ', err.message);
     }
 
     // Default static fallback plan ID just in case
@@ -213,51 +213,22 @@ async function createCheckout(cartPayload, customerEmail = null) {
             checkout_id: response.data?.id || response.data?.data?.id
         };
     } catch (error) {
-        // Sanitize the request payload to ensure no sensitive credentials, secrets, or buyer emails are logged
-        const sanitizedPayload = {
-            mode: payload.mode,
-            plan: {
-                company_id: payload.plan?.company_id,
-                product_id: payload.plan?.product_id,
-                plan_type: payload.plan?.plan_type,
-                initial_price: payload.plan?.initial_price,
-                renewal_price: payload.plan?.renewal_price,
-                billing_period: payload.plan?.billing_period,
-                trial_period_days: payload.plan?.trial_period_days,
-                currency: payload.plan?.currency
-            },
-            redirect_url: payload.redirect_url,
-            metadata_size: payload.metadata ? JSON.stringify(payload.metadata).length : 0
-        };
-
-        // Extract Shopify cart debugging information for audit
-        const cartDebugInfo = {
-            total_price: cartPayload?.total_price,
-            items_subtotal_price: cartPayload?.items_subtotal_price,
-            total_discount: cartPayload?.total_discount,
-            items: (cartPayload?.items || []).map(item => ({
-                handle: item.handle,
-                variant_title: item.variant_title || item.title,
-                quantity: item.quantity,
-                final_price: item.final_price || item.price,
-                final_line_price: item.final_line_price || item.line_price || ((item.final_price || item.price) * item.quantity)
-            }))
-        };
-
+        // Serialized error logging to prevent collapsing in Vercel UI
         console.error(
-            '[Whop Checkout Response Body]',
-            JSON.stringify(error.response?.data, null, 2)
+            "[WHOP_FULL_ERROR]",
+            JSON.stringify(error.response?.data)
         );
 
-        console.error(
-            '[Whop Checkout Payload]',
-            JSON.stringify(sanitizedPayload, null, 2)
-        );
-
-        console.error(
-            '[Shopify Cart Totals]',
-            JSON.stringify(cartDebugInfo, null, 2)
-        );
+        console.error("[WHOP_PLAN_SUMMARY]", JSON.stringify({
+            plan_type: payload.plan?.plan_type,
+            initial_price: payload.plan?.initial_price,
+            renewal_price: payload.plan?.renewal_price,
+            trial_period_days: payload.plan?.trial_period_days,
+            currency: payload.plan?.currency,
+            company_id: payload.plan?.company_id,
+            product_id: payload.plan?.product_id,
+            metadata_size: JSON.stringify(payload.metadata || {}).length
+        }));
 
         throw new Error(`Whop Checkout API error: ${error.response?.data ? JSON.stringify(error.response.data, null, 2) : error.message}`);
     }

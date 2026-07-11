@@ -23,24 +23,34 @@ SHOPIFY_API_VERSION=2026-07
 # Membership Configuration Details
 MEMBERSHIP_PRODUCT_ID=corvea-beauty-journal # Shopify product handle for the membership subscription
 MEMBERSHIP_CHECKOUT_LINK=https://whop.com/checkout/plan_TZycBpe6PAHCk # Default Whop checkout link for membership
+
+# Upstash Redis Persistence (Required for complex cart synchronization)
+UPSTASH_REDIS_REST_URL=https://your-database-name.upstash.io
+UPSTASH_REDIS_REST_TOKEN=your_upstash_redis_rest_token
 ```
 
 ---
 
 ## Technical Architecture & Cart Strategy
-Whop is natively designed for single-product digital checkout configurations (one plan per session). To support checking out multiple Shopify products at once in a single checkout session, the middleware utilizes **on-the-fly pricing configurations**:
+Whop is natively designed for single-product digital checkout configurations (one plan per session) and rejects metadata values that exceed a 500-character ceiling. To support complex carts with digital subscriptions, discount rules, and physical items, we implement the following flow:
+
 1. When a checkout is initiated, the frontend sends the cart object `/cart.js` contents to `/api/create-checkout`.
-2. The server iterates over the cart items. It checks if the **Corvea Beauty Journal Membership** is in the cart.
-3. Pricing calculations:
-   - **One-time only carts:** A checkout configuration is created with `plan_type: "one_time"` and `initial_price` equal to the total of the cart items.
-   - **Membership-only carts:** A checkout configuration is created with `plan_type: "renewal"`, `initial_price: 0.00`, `renewal_price: 39.99` representing the A$39.99/mo ongoing rate starting after a `30-day` free trial.
-   - **Mixed carts (Membership + One-time):** A checkout configuration is created with `plan_type: "renewal"`, `initial_price` equal to the total of the one-time items (charged immediately), and `renewal_price: 39.99` representing the membership subscription with a `30-day` free trial.
-4. The exact Shopify line items (Variant IDs, quantities, handles) are serialized and attached to the checkout configuration's **`metadata`**.
-5. When Whop receives payment and sends a `payment.succeeded` or `membership.activated` webhook:
-   - The payload signature is computed and verified against `WHOP_WEBHOOK_SECRET` using Standard Webhooks HMAC-SHA256.
-   - The metadata is parsed.
-   - An idempotency checks verifies Shopify order details to prevent duplicates.
-   - A paid Shopify order is created via the Admin REST API, which automatically syncs inventories.
+2. The server processes the cart items, calculating upfront costs and identifying if the **Corvea Beauty Journal Membership** is in the cart.
+3. **Cart Serialization & Storage:** Instead of dispatching the complete product schema directly in Whop metadata (which would crash due to the 500-char value limit), the server generates a unique `checkout_reference` (e.g. `ref_b12a8f...`) and registers the complete Shopify cart on **Upstash Redis** under the key **`checkout:{checkout_reference}`** with a **24-hour Time-to-Live (TTL)**.
+4. **Lightweight Whop Metadata:** Only compact references are passed inside the Whop checkout configuration payload, ensuring all values remain under 150 characters:
+   - `checkout_reference`
+   - `shopify_cart_token`
+   - `expected_total`
+   - `currency`
+   - `membership_selected`
+   - `item_count`
+5. When Whop receives payment and fires a `payment.succeeded` or `membership.activated` webhook:
+   - The Whop signature is validated (HMAC-SHA256).
+   - An **Idempotency Check** is performed first against Shopify Order records using the transaction ID.
+   - The stored cart matches are queried from Redis using `checkout_reference`.
+   - Total payment amount and currency matches are confirmed against expected value metadata.
+   - The paid Shopify order is created via the Admin REST API.
+   - **Cleanup:** On success, the Redis key is deleted. If creation fails, the record is preserved to support retry attempts.
 
 ---
 
@@ -53,7 +63,7 @@ Whop is natively designed for single-product digital checkout configurations (on
 2. Run log in and deploy:
    ```bash
    vercel login
-   } vercel
+   vercel
    ```
 3. Set your production environment secrets on Vercel:
    ```bash
@@ -67,6 +77,8 @@ Whop is natively designed for single-product digital checkout configurations (on
    vercel env add SHOPIFY_API_VERSION
    vercel env add MEMBERSHIP_PRODUCT_ID
    vercel env add MEMBERSHIP_CHECKOUT_LINK
+   vercel env add UPSTASH_REDIS_REST_URL
+   vercel env add UPSTASH_REDIS_REST_TOKEN
    ```
 4. Deploy to production:
    ```bash
@@ -83,13 +95,13 @@ Whop is natively designed for single-product digital checkout configurations (on
 4. Click select events and listen to:
    - `payment.succeeded`
    - `membership.activated`
-5. Copy the generated Webhook Secret (starts with `whsec_...`) and save it to your server's `WHOP_WEBHOOK_SECRET` environment variable.
+5. Copy the generated Webhook Secret (starts with `whsec_...`) and save it to your Vercel/server's `WHOP_WEBHOOK_SECRET` environment variable.
 
 ---
 
 ## 4. Shopify Theme Integration (Shrine Theme)
 
-To redirect customers from the checkout buttons of your Shopify store to Whop, follow these steps to install the client-side script in your **Shrine** theme:
+To redirect customers from the checkout buttons of your Shopify store to Whop, install the client-side script in your **Shrine** theme:
 
 1. In your Shopify Admin, go to **Online Store** > **Themes**.
 2. Locate your **Shrine** theme, click the three dots (`...`), and select **Edit code**.
@@ -229,7 +241,7 @@ Execute script:
 node test-run.js
 ```
 This runs the integration test suite, demonstrating:
-- Cart checkouts calculations and Whop checkout config url creation.
-- Webhook HMAC SHA-256 validation.
-- Subscriptions/Trial calculations setup.
-- Paid order creation outputs.
+- Multiple checkout scenarios (membership only, physical items, large discounts, zero-priced free gift, bundle items).
+- Webhook signature verification and idempotency check.
+- Redis database mapping state storage/retrieval.
+- Controlled rejection of invalid/expired checkouts.

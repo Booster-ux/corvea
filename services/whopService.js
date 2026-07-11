@@ -1,6 +1,8 @@
 const axios = require('axios');
+const crypto = require('crypto');
 const whopConfig = require('../config/whop');
 const productMappings = require('../config/product-mappings.json');
+const redisService = require('./redisService');
 
 let cachedCompanyId = process.env.WHOP_COMPANY_ID || null;
 
@@ -154,7 +156,7 @@ async function createCheckout(cartPayload, customerEmail = null) {
 
     if (isMembershipInCart) {
         // Renewal billing structure:
-        // - Initial price = total sum of one-time items upfront (e.g. A$54.98)
+        // - Initial price = total sum of one-time items upfront (e.g. A$307.68)
         // - Renewal price = A$39.99 (monthly journal subscription)
         // - Free trial = 30 days
         // - Associated product = Corvea Beauty Journal (required by Whop API for dynamic renewal plans)
@@ -178,20 +180,44 @@ async function createCheckout(cartPayload, customerEmail = null) {
         };
     }
 
+    // Generate secure, unique key reference
+    const checkoutReference = 'ref_' + crypto.randomBytes(16).toString('hex');
+
+    // Mapped lightweight metadata sent to Whop (strictly under 500 chars limit per key value)
     const payload = {
         // Note: company_id must NOT be at the top level of this request, otherwise Whop returns a 400 bad request error
         mode: 'payment',
         plan: planPayload,
         redirect_url: `https://${cartPayload.host || 'corvea.store'}/pages/thank-you`,
         metadata: {
+            checkout_reference: checkoutReference,
             shopify_cart_token: cartPayload.token || '',
-            customer_email: customerEmail || '',
-            cart_items_json: JSON.stringify(mappedItems)
+            expected_total: String(oneTimeAmountDecimal),
+            currency: 'aud',
+            membership_selected: isMembershipInCart ? 'true' : 'false',
+            item_count: String(mappedItems.reduce((acc, item) => acc + item.quantity, 0))
         }
     };
 
+    // Construct persistent cache registry model definition
+    const cartRecord = {
+        cart_token: cartPayload.token || '',
+        items: mappedItems,
+        expected_total: oneTimeAmountDecimal,
+        currency: 'aud',
+        membership_selected: isMembershipInCart,
+        item_count: mappedItems.reduce((acc, item) => acc + item.quantity, 0),
+        timestamp: new Date().toISOString()
+    };
+
     try {
+        // Store full map details server side under Redis with 24 hours TTL expiration
+        const redisKey = `checkout:${checkoutReference}`;
+        await redisService.set(redisKey, cartRecord, 86400);
+
+        console.log(`[Whop Checkout] Stored checkout details to Redis, Key: ${redisKey}`);
         console.log(`[Whop Checkout] Creating checkout configuration for plan type: ${planPayload.plan_type}...`);
+
         const response = await axios.post(
             `${whopConfig.apiUrl}/checkout_configurations`,
             payload,

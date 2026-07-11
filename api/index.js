@@ -7,6 +7,7 @@ dotenv.config();
 const checkoutController = require('../controllers/checkoutController');
 const webhookController = require('../controllers/webhookController');
 const validateWebhook = require('../middleware/validateWebhook');
+const redisService = require('../services/redisService');
 
 const app = express();
 
@@ -36,12 +37,22 @@ app.get('/api/auth/callback', (req, res) => {
 app.post('/api/create-checkout', checkoutController.handleCreateCheckout);
 app.post('/api/whop-webhook', validateWebhook, webhookController.handleWebhook);
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-    res.status(200).json({
-        status: 'healthy',
-        timestamp: new Date().toISOString()
-    });
+// Health check endpoint with Redis status
+app.get('/api/health', async (req, res) => {
+    try {
+        const redisHealth = await redisService.ping();
+        res.status(200).json({
+            status: 'healthy',
+            redis: redisHealth,
+            timestamp: new Date().toISOString()
+        });
+    } catch (err) {
+        res.status(500).json({
+            status: 'degraded',
+            error: err.message,
+            timestamp: new Date().toISOString()
+        });
+    }
 });
 
 // Local development server listener

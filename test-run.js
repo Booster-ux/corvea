@@ -1,5 +1,9 @@
 const axios = require('axios');
 const crypto = require('crypto');
+const redisService = require('./services/redisService');
+
+// Track created orders to simulate duplicate check (idempotency) dynamically
+const createdOrders = [];
 
 // 1. Mock network layer globally before importing our app
 const originalPost = axios.post;
@@ -7,15 +11,15 @@ const originalGet = axios.get;
 
 const MOCK_WEBHOOK_SECRET = 'whsec_YTM0NTY3ODkwMTIzNDU2Nzg5MDEyMzQ1Njc4OTA='; // base64 compatible mock key
 
-// Inject mock behaviors
+// Inject mock behaviors for third party calls
 axios.get = async function (url, config) {
     if (url.includes('/companies')) {
         console.log('   [Mock API] GET /companies -> Returning mock company list');
         return { data: { data: [{ id: 'biz_test_12345' }] } };
     }
     if (url.includes('/orders.json')) {
-        console.log('   [Mock API] GET /orders.json -> Returning empty order history (no duplicates)');
-        return { data: { orders: [] } };
+        console.log(`   [Mock API] GET /orders.json -> Returning ${createdOrders.length} mocked orders`);
+        return { data: { orders: createdOrders } };
     }
     return originalGet.apply(this, arguments);
 };
@@ -31,23 +35,28 @@ axios.post = async function (url, data, config) {
         };
     }
     if (url.includes('/checkout_configurations')) {
-        console.log('   [Mock API] POST /checkout_configurations -> Returning mock checkout purchase_url');
+        // Return purchase URL containing the plan ID or created inline session
+        const planId = data.plan?.product_id ? 'plan_XA564i63pBo41' : 'plan_Pj1GzRRMdZzJ9';
+        const session = 'ch_JddUmJt2Ep8sqc5';
         return {
             data: {
-                id: 'config_mock_999',
-                purchase_url: 'https://whop.com/checkout/plan_Pj1GzRRMdZzJ9?config=config_mock_999'
+                id: session,
+                purchase_url: `https://whop.com/checkout/${planId}/?session=${session}`
             }
         };
     }
     if (url.includes('/orders.json')) {
         console.log('   [Mock API] POST /orders.json -> Shopify Order creation success!');
+        const newOrder = {
+            id: 888877770000 + createdOrders.length,
+            email: data.order.email,
+            total_price: data.order.transactions[0].amount,
+            note_attributes: data.order.note_attributes || []
+        };
+        createdOrders.push(newOrder);
         return {
             data: {
-                order: {
-                    id: 888877776666,
-                    email: data.order.email,
-                    total_price: data.order.transactions[0].amount
-                }
+                order: newOrder
             }
         };
     }
@@ -62,11 +71,27 @@ process.env.SHOPIFY_CLIENT_ID = 'test_client_id_4455';
 process.env.SHOPIFY_CLIENT_SECRET = 'test_client_secret_6677';
 process.env.SHOPIFY_ADMIN_API_TOKEN = 'shpat_test_token';
 
-// Import our server
+// Import our server app
 const app = require('./api/index');
 const PORT = 3535;
 
 let server;
+
+// Helper to sign webhook requests matching Whop Standard Header signature compliance
+function signWebhook(payloadStr, transactionId = 'pay_tx_999') {
+    const webhookId = `msg_wh_${crypto.randomBytes(8).toString('hex')}`;
+    const webhookTimestamp = Math.floor(Date.now() / 1000).toString();
+    const signedContent = `${webhookId}.${webhookTimestamp}.${payloadStr}`;
+    const keyBuffer = Buffer.from(MOCK_WEBHOOK_SECRET.substring(6), 'base64');
+    const signature = crypto.createHmac('sha256', keyBuffer).update(signedContent).digest('base64');
+
+    return {
+        'Content-Type': 'application/json',
+        'webhook-id': webhookId,
+        'webhook-timestamp': webhookTimestamp,
+        'webhook-signature': `v1,${signature}`
+    };
+}
 
 async function runTests() {
     server = app.listen(PORT, async () => {
@@ -75,114 +100,273 @@ async function runTests() {
         console.log(`======================================================\n`);
 
         try {
-            // Test 1: Health check
-            console.log('Test 1: Verifying Health Check API...');
+            // Test 1: Health Check (with Redis backend ping)
+            console.log('Test 1: Verifying Health Check API (with Redis)...');
             const healthRes = await axios.get(`http://localhost:${PORT}/api/health`);
             if (healthRes.status === 200 && healthRes.data.status === 'healthy') {
-                console.log('✅ Health Check Verified: OK');
+                console.log(`✅ Health Check Verified: OK. Redis status: ${healthRes.data.redis}`);
             } else {
-                throw new Error('Health check failed');
+                throw new Error('Health check API failed.');
             }
 
-            // Test 2: Create Checkout for Mixed Shopify Cart
-            console.log('\nTest 2: Requesting checkout configuration for Shopify cart...');
-            const mockCartPayload = {
-                cart: {
-                    token: 'cart_token_abc123xyz',
-                    items: [
-                        {
-                            id: '430099558832', // Toner variant ID
-                            handle: 'skintific-5x-ceramide-soothing-toner',
-                            title: '5X Ceramide Soothing Toner',
-                            price: 1499, // cents (14.99)
-                            quantity: 2
-                        },
-                        {
-                            id: '430099558839', // Membership variant ID
-                            handle: 'corvea-beauty-journal',
-                            title: 'Corvea Beauty Journal - Membership',
-                            price: 3999, // cents (39.99/mo)
-                            quantity: 1
-                        }
-                    ]
-                },
-                customer_email: 'buyer@example.com'
-            };
+            // Test 2: Generate unique checkouts representing different Shopify cart sizes / rules
+            console.log('\nTest 2: Generating Checkout configurations under different scenarios...');
 
-            const checkoutRes = await axios.post(`http://localhost:${PORT}/api/create-checkout`, mockCartPayload);
-            if (checkoutRes.status === 200 && checkoutRes.data.purchase_url) {
-                console.log('✅ Checkout Generation Verified: OK');
-                console.log('   Generated URL:', checkoutRes.data.purchase_url);
-            } else {
-                throw new Error('Checkout generation failed');
-            }
-
-            // Test 3: Standard Webhook HMAC Signature Validation
-            console.log('\nTest 3: Processing Webhook payment.succeeded from Whop...');
-            const webhookPayload = JSON.stringify({
-                action: 'payment.succeeded',
-                data: {
-                    id: 'pay_txn_whop_98765',
-                    amount: 29.98, // 29.98 paid for 2x toners, subscription recurring trial = A$0 upfront
-                    currency: 'aud',
-                    email: 'buyer@example.com',
-                    customer: {
-                        username: 'Jane Buyer',
-                        email: 'buyer@example.com'
-                    },
-                    metadata: {
-                        shopify_cart_token: 'cart_token_abc123xyz',
-                        customer_email: 'buyer@example.com',
-                        cart_items_json: JSON.stringify([
+            const testCarts = [
+                {
+                    name: 'membership only',
+                    cart: {
+                        token: 'cart_sub_100',
+                        items: [
                             {
-                                variant_id: '430099558832',
-                                handle: 'skintific-5x-ceramide-soothing-toner',
-                                title: '5X Ceramide Soothing Toner',
-                                price_cents: 1499,
-                                quantity: 2,
-                                is_membership: false
-                            },
-                            {
-                                variant_id: '430099558839',
+                                id: '430099558839',
                                 handle: 'corvea-beauty-journal',
                                 title: 'Corvea Beauty Journal - Membership',
-                                price_cents: 3999,
-                                quantity: 1,
-                                is_membership: true
+                                price: 3999, // 39.99/mo (but A$0 upfront today due to 30 days trial)
+                                quantity: 1
                             }
-                        ])
+                        ]
+                    },
+                    email: 'buyer-sub@example.com',
+                    expectedUpfront: 0.00
+                },
+                {
+                    name: 'one physical product',
+                    cart: {
+                        token: 'cart_phys_200',
+                        items: [
+                            {
+                                id: '430099558832',
+                                handle: 'skintific-5x-ceramide-soothing-toner',
+                                title: '5X Ceramide Soothing Toner',
+                                price: 1499,
+                                quantity: 1
+                            }
+                        ]
+                    },
+                    email: 'buyer-toner@example.com',
+                    expectedUpfront: 14.99
+                },
+                {
+                    name: 'large discounted cart above A$250',
+                    cart: {
+                        token: 'cart_large_300',
+                        total_price: 30768, // cents (307.68)
+                        items_subtotal_price: 30768,
+                        total_discount: 24620,
+                        items: [
+                            {
+                                id: '430099558855',
+                                handle: 'expensive-skincare-bundle',
+                                title: 'Premium Skincare Bundle Stack',
+                                price: 55388,
+                                final_price: 30768, // After bundle discount
+                                quantity: 1
+                            }
+                        ]
+                    },
+                    email: 'buyer-large@example.com',
+                    expectedUpfront: 307.68
+                },
+                {
+                    name: 'multiple quantities, bundles, and zero-priced free gift',
+                    cart: {
+                        token: 'cart_gift_400',
+                        items: [
+                            {
+                                id: '430099558832',
+                                handle: 'skintific-5x-ceramide-soothing-toner',
+                                title: '5X Ceramide Soothing Toner',
+                                price: 1499,
+                                quantity: 3
+                            },
+                            {
+                                id: '430099559900',
+                                handle: 'free-gift-face-cream',
+                                title: 'Calm Active Free Cream Gift',
+                                price: 999,
+                                final_price: 0, // Free product gift!
+                                quantity: 1
+                            }
+                        ]
+                    },
+                    email: 'buyer-gift@example.com',
+                    expectedUpfront: 44.97 // 14.99 * 3 = 44.97
+                },
+                {
+                    name: 'mixed cart (physical products + membership)',
+                    cart: {
+                        token: 'cart_mixed_500',
+                        items: [
+                            {
+                                id: '430099558832',
+                                handle: 'skintific-5x-ceramide-soothing-toner',
+                                title: '5X Ceramide Soothing Toner',
+                                price: 1499,
+                                quantity: 2
+                            },
+                            {
+                                id: '430099558839',
+                                handle: 'corvea-beauty-journal',
+                                title: 'Corvea Beauty Journal - Membership',
+                                price: 3999,
+                                quantity: 1
+                            }
+                        ]
+                    },
+                    email: 'buyer-mixed@example.com',
+                    expectedUpfront: 29.98
+                }
+            ];
+
+            const activeCheckouts = [];
+
+            for (const item of testCarts) {
+                const res = await axios.post(`http://localhost:${PORT}/api/create-checkout`, {
+                    cart: item.cart,
+                    customer_email: item.email
+                });
+
+                if (res.status === 200 && res.data.purchase_url) {
+                    // Extract session/checkout ID configuration
+                    const urlParsed = new URL(res.data.purchase_url);
+                    const checkoutId = urlParsed.searchParams.get('session');
+
+                    // Intercept the database entry to fetch the checkout reference
+                    let refKey = null;
+                    const store = redisService.isRedisAvailable ? {} : redisService.getInMemoryStore?.();
+                    if (store) {
+                        for (const k of Object.keys(store)) {
+                            const val = JSON.parse(store[k]);
+                            if (val.cart_token === item.cart.token) {
+                                refKey = k;
+                                break;
+                            }
+                        }
+                    }
+
+                    console.log(`   ✅ "${item.name}" scenario success. Upfront price: A$${item.expectedUpfront}. Linked reference: ${refKey}`);
+
+                    if (refKey) {
+                        activeCheckouts.push({
+                            name: item.name,
+                            cart: item.cart,
+                            checkout_reference: refKey.replace('checkout:', ''),
+                            expected_total: item.expectedUpfront,
+                            email: item.email,
+                            checkout_id: checkoutId || 'ch_test_default'
+                        });
+                    }
+                } else {
+                    throw new Error(`Checkout config failed for scenario: ${item.name}`);
+                }
+            }
+
+            // Test 3: Process the simulated webhooks based on the created checkouts
+            console.log('\nTest 3: Testing webhook handlers and verification logic...');
+
+            for (const ch of activeCheckouts) {
+                const webhookPayload = JSON.stringify({
+                    action: 'payment.succeeded',
+                    data: {
+                        id: `pay_${ch.checkout_reference}`,
+                        amount: ch.expected_total, // matching expected dollar totals
+                        currency: 'aud',
+                        email: ch.email,
+                        customer: {
+                            username: 'Jane Buyer',
+                            email: ch.email
+                        },
+                        metadata: {
+                            checkout_reference: ch.checkout_reference,
+                            shopify_cart_token: ch.cart.token,
+                            expected_total: String(ch.expected_total),
+                            currency: 'aud',
+                            membership_selected: ch.name.includes('membership') ? 'true' : 'false',
+                            item_count: String(ch.cart.items.length)
+                        }
+                    }
+                });
+
+                console.log(`   Simulating payment.succeeded webhook for "${ch.name}" (total: A$${ch.expected_total})...`);
+                const headers = signWebhook(webhookPayload);
+                const webhookRes = await axios.post(`http://localhost:${PORT}/api/whop-webhook`, webhookPayload, { headers });
+
+                if (webhookRes.status === 201 && webhookRes.data.shopify_order_id) {
+                    console.log(`   ✅ Webhook processed. Shopify Order ID Created: ${webhookRes.data.shopify_order_id}`);
+
+                    // Verify Redis key was deleted on success
+                    const deletedVal = await redisService.get(`checkout:${ch.checkout_reference}`);
+                    if (deletedVal === null) {
+                        console.log(`   ✅ Redis key checkout:${ch.checkout_reference} successfully deleted!`);
+                    } else {
+                        throw new Error(`Redis key checkout:${ch.checkout_reference} was NOT deleted after successful order creation.`);
+                    }
+                } else {
+                    throw new Error(`Webhook payment simulation failed for scenario: ${ch.name}`);
+                }
+            }
+
+            // Test 4: Idempotency protection check (duplicate webhook delivery)
+            console.log('\nTest 4: Verifying duplicate webhook delivery (idempotency)...');
+            const targetCh = activeCheckouts[0];
+            const duplicatePayload = JSON.stringify({
+                action: 'payment.succeeded',
+                data: {
+                    id: `pay_${targetCh.checkout_reference}`, // Duplicate transaction ID
+                    amount: targetCh.expected_total,
+                    currency: 'aud',
+                    email: targetCh.email,
+                    metadata: {
+                        checkout_reference: targetCh.checkout_reference,
+                        shopify_cart_token: targetCh.cart.token,
+                        expected_total: String(targetCh.expected_total),
+                        currency: 'aud',
+                        membership_selected: 'true',
+                        item_count: '1'
                     }
                 }
             });
 
-            // Generate webhook headers using the Standard Webhooks spec
-            const webhookId = 'msg_wh_id_445566';
-            const webhookTimestamp = Math.floor(Date.now() / 1000).toString();
-            const signedContent = `${webhookId}.${webhookTimestamp}.${webhookPayload}`;
+            const dupHeaders = signWebhook(duplicatePayload);
+            const dupRes = await axios.post(`http://localhost:${PORT}/api/whop-webhook`, duplicatePayload, { headers: dupHeaders });
 
-            // Extract key from whsec_
-            const keyBuffer = Buffer.from(MOCK_WEBHOOK_SECRET.substring(6), 'base64');
-            const signature = crypto
-                .createHmac('sha256', keyBuffer)
-                .update(signedContent)
-                .digest('base64');
+            if (dupRes.status === 200 && dupRes.data.message === 'Order already processed.') {
+                console.log('✅ Duplicate webhooks correctly blocked without duplicating order!');
+            } else {
+                throw new Error('Failed to block duplicate webhook trigger.');
+            }
 
-            const webhookHeaders = {
-                'Content-Type': 'application/json',
-                'webhook-id': webhookId,
-                'webhook-timestamp': webhookTimestamp,
-                'webhook-signature': `v1,${signature}`
-            };
-
-            const webhookRes = await axios.post(`http://localhost:${PORT}/api/whop-webhook`, webhookPayload, {
-                headers: webhookHeaders
+            // Test 5: Verify missing or expired checkout reference rejection
+            console.log('\nTest 5: Verifying missing/expired checkout reference rejection...');
+            const invalidPayload = JSON.stringify({
+                action: 'payment.succeeded',
+                data: {
+                    id: `pay_invalid_12345`,
+                    amount: 29.98,
+                    currency: 'aud',
+                    email: 'buyer@example.com',
+                    metadata: {
+                        checkout_reference: 'ref_expired_or_non_existent',
+                        shopify_cart_token: 'cart_expired',
+                        expected_total: '29.98',
+                        currency: 'aud',
+                        membership_selected: 'false',
+                        item_count: '1'
+                    }
+                }
             });
 
-            if (webhookRes.status === 201 && webhookRes.data.shopify_order_id) {
-                console.log('✅ Webhook Validation & Order Creation Verified: OK');
-                console.log('   Shopify Order Created ID:', webhookRes.data.shopify_order_id);
-            } else {
-                throw new Error('Webhook processing failed');
+            const invalidHeaders = signWebhook(invalidPayload);
+            try {
+                await axios.post(`http://localhost:${PORT}/api/whop-webhook`, invalidPayload, { headers: invalidHeaders });
+                throw new Error('Webhook processed an invalid checkout reference which should have failed.');
+            } catch (err) {
+                if (err.response && err.response.status === 400 && err.response.data.error === 'Missing or expired checkout reference.') {
+                    console.log('✅ Expired/missing checkout reference correctly rejected with controlled HTTP 400!');
+                } else {
+                    throw err;
+                }
             }
 
             console.log(`\n======================================================`);

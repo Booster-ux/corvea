@@ -213,9 +213,34 @@ async function createCheckout(cartPayload, customerEmail = null) {
             checkout_id: response.data?.id || response.data?.data?.id
         };
     } catch (error) {
-        const sanitized = sanitizeAxiosError(error);
-        console.error('[Whop Checkout Error] Failed to generate checkout configuration:', sanitized);
-        throw new Error(`Whop Checkout API error: ${JSON.stringify(sanitized.data) || sanitized.message}`);
+        // Sanitize the request payload to ensure no sensitive credentials, secrets, or buyer emails are logged
+        const sanitizedPayload = {
+            mode: payload.mode,
+            plan: {
+                company_id: payload.plan?.company_id,
+                product_id: payload.plan?.product_id,
+                plan_type: payload.plan?.plan_type,
+                initial_price: payload.plan?.initial_price,
+                renewal_price: payload.plan?.renewal_price,
+                billing_period: payload.plan?.billing_period,
+                trial_period_days: payload.plan?.trial_period_days,
+                currency: payload.plan?.currency
+            },
+            redirect_url: payload.redirect_url,
+            metadata: {
+                shopify_cart_token: payload.metadata?.shopify_cart_token
+            }
+        };
+
+        const errorDetails = {
+            endpoint: `POST ${whopConfig.apiUrl}/checkout_configurations`,
+            status: error.response?.status || 'N/A',
+            response_body: error.response?.data || error.message,
+            payload: sanitizedPayload
+        };
+
+        console.error('[Whop Checkout Validation Error]:', JSON.stringify(errorDetails, null, 2));
+        throw new Error(`Whop Checkout API error: ${error.response?.data ? JSON.stringify(error.response.data, null, 2) : error.message}`);
     }
 }
 

@@ -25,9 +25,20 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization', 'webhook-signature', 'webhook-id', 'webhook-timestamp']
 }));
 
+const path = require('path');
+app.use('/.well-known', express.static(path.join(__dirname, '../public/.well-known')));
+
 // API Endpoints
 app.get('/', (req, res) => {
+    const { reference, session, plan } = req.query;
+    if (reference || session || plan) {
+        return res.sendFile(path.join(__dirname, '../public/checkout.html'));
+    }
     res.status(200).send('Shopify-Whop Checkout Integration Gateway is running.');
+});
+
+app.get('/complete', (req, res) => {
+    res.sendFile(path.join(__dirname, '../public/complete.html'));
 });
 
 app.get('/api/auth/callback', (req, res) => {
@@ -35,6 +46,7 @@ app.get('/api/auth/callback', (req, res) => {
 });
 
 app.post('/api/create-checkout', checkoutController.handleCreateCheckout);
+app.get('/api/checkout-summary/:checkout_reference', checkoutController.handleCheckoutSummary);
 app.post('/api/whop-webhook', validateWebhook, webhookController.handleWebhook);
 
 // Health check endpoint with Redis status

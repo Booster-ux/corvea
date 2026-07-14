@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Checkout | Corvea</title>
+    <!-- Premium Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --navy-primary: #0F2C59;
+            --navy-hover: #0a1f3f;
+            --blue-accent: #A8D1E7;
+            --emerald-green: #10B981;
+            --emerald-bg: #ECFDF5;
+            --emerald-border: #A7F3D0;
+            --text-dark: #1E293B;
+            --text-muted: #64748B;
+            --border-color: #E2E8F0;
+            --bg-light: #F8FAFC;
+            --card-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+            --transition-smooth: all 0.2s ease-in-out;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            color: var(--text-dark);
+            background-color: #FFFFFF;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Header Style */
+        header {
+            width: 100%;
+            padding: 24px 0;
+            border-bottom: 1px solid var(--border-color);
+            background: #FFFFFF;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Two-Column Grid */
+        .checkout-container {
+            max-width: 1100px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1.1fr 0.9fr;
+            min-height: calc(100vh - 100px);
+        }
+
+        /* Left Column: Payment */
+        .payment-section {
+            padding: 40px 48px 40px 0;
+            border-right: 1px solid var(--border-color);
+        }
+
+        /* Right Column: Order Summary */
+        .summary-section {
+            padding: 40px 0 40px 48px;
+            background-color: #FFFFFF;
+        }
+
+        /* Logo styling resembling screenshot */
+        .corvea-logo {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+        }
+
+        /* Section Titles */
+        .section-title {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 500;
+            font-size: 20px;
+            color: var(--navy-primary);
+            margin-bottom: 24px;
+        }
+
+        /* Embedded Checkout Placeholder & Iframe Wrap */
+        #checkout-embed-container {
+            width: 100%;
+            min-height: 480px;
+            position: relative;
+        }
+
+        .embed-loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #FFFFFF;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--navy-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Custom Button Style */
+        .custom-submit-btn-wrapper {
+            margin-top: 32px;
+        }
+
+        .complete-btn {
+            width: 100%;
+            font-family: 'Outfit', sans-serif;
+            font-size: 16px;
+            font-weight: 600;
+            color: #FFFFFF;
+            background-color: var(--navy-primary);
+            border: none;
+            border-radius: 8px;
+            padding: 16px 24px;
+            cursor: pointer;
+            transition: var(--transition-smooth);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .complete-btn:hover:not(:disabled) {
+            background-color: var(--navy-hover);
+            box-shadow: 0 4px 12px rgba(15, 44, 89, 0.2);
+        }
+
+        .complete-btn:disabled {
+            background-color: #94A3B8;
+            cursor: not-allowed;
+            opacity: 0.8;
+        }
+
+        .btn-spinner {
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: #FFFFFF;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        /* Order Summary Items */
+        .cart-items-list {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            margin-bottom: 24px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 24px;
+        }
+
+        .cart-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .item-details {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .item-name {
+            font-weight: 500;
+            font-size: 15px;
+            color: var(--text-dark);
+        }
+
+        .item-variant {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .item-quantity-badge {
+            background: #F1F5F9;
+            color: var(--text-dark);
+            font-size: 12px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 999px;
+            margin-top: 4px;
+            width: fit-content;
+        }
+
+        .item-pricing {
+            text-align: right;
+        }
+
+        .item-price {
+            font-weight: 600;
+            font-size: 15px;
+        }
+
+        .price-compare {
+            font-size: 13px;
+            color: var(--text-muted);
+            text-decoration: line-through;
+            margin-right: 6px;
+        }
+
+        .free-gift-label {
+            color: var(--emerald-green);
+            font-weight: 600;
+            font-size: 12px;
+            background-color: var(--emerald-bg);
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid var(--emerald-border);
+        }
+
+        /* Order Totals */
+        .summary-totals {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 24px;
+            margin-bottom: 24px;
+        }
+
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        .total-row.grand-total {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--navy-primary);
+            font-family: 'Outfit', sans-serif;
+            margin-top: 4px;
+        }
+
+        /* Trial Callout Box */
+        .trial-callout {
+            background-color: var(--bg-light);
+            border: 1px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .trial-icon {
+            color: var(--emerald-green);
+            font-size: 20px;
+            line-height: 1;
+        }
+
+        .trial-title {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--navy-primary);
+            margin-bottom: 4px;
+        }
+
+        .trial-text {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        /* Mobile Summary Header */
+        .mobile-summary-toggle {
+            display: none;
+            width: 100%;
+            background: var(--bg-light);
+            border-bottom: 1px solid var(--border-color);
+            padding: 16px 20px;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .mobile-summary-toggle-text {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--navy-primary);
+        }
+
+        .mobile-summary-total {
+            font-weight: 700;
+            color: var(--navy-primary);
+        }
+
+        /* Errors and Validation Page overlay */
+        .error-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #FFFFFF;
+            z-index: 100;
+            padding: 40px 24px;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .error-card {
+            max-width: 480px;
+            padding: 32px;
+            border-radius: 12px;
+            background: #FFF5F5;
+            border: 1px solid #FED7D7;
+            box-shadow: var(--card-shadow);
+        }
+
+        .error-badge {
+            font-size: 40px;
+            margin-bottom: 16px;
+        }
+
+        .error-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 20px;
+            color: #C53030;
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+
+        .error-text {
+            font-size: 14px;
+            color: #742A2A;
+            margin-bottom: 24px;
+        }
+
+        .btn-fallback {
+            display: inline-block;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            text-decoration: none;
+            background-color: var(--navy-primary);
+            color: #FFFFFF;
+            padding: 12px 24px;
+            border-radius: 6px;
+            transition: var(--transition-smooth);
+        }
+
+        .btn-fallback:hover {
+            background-color: var(--navy-hover);
+        }
+
+        /* Inline Banner Error notifications */
+        .alert-banner {
+            display: none;
+            background-color: #FFF5F5;
+            border: 1px solid #FED7D7;
+            color: #C53030;
+            padding: 12px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
+        /* Responsive Breakpoints */
+        @media (max-width: 820px) {
+            .checkout-container {
+                grid-template-columns: 1fr;
+                min-height: auto;
+            }
+
+            .mobile-summary-toggle {
+                display: flex;
+            }
+
+            .payment-section {
+                padding: 32px 20px;
+                border-right: none;
+                order: 2;
+            }
+
+            .summary-section {
+                padding: 20px;
+                border-bottom: 1px solid var(--border-color);
+                background-color: #FFFFFF;
+                display: none; /* Controlled dynamically on mobile */
+                order: 1;
+            }
+
+            .summary-section.active {
+                display: block;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header containing the branded logo -->
+    <header>
+        <div class="corvea-logo">
+            <svg viewBox="0 0 300 130" xmlns="http://www.w3.org/2000/svg" style="width: 156px; height: auto;">
+                <text x="150" y="70" text-anchor="middle" font-family="'Outfit', 'Inter', sans-serif" font-weight="600" font-size="52" fill="#0F2C59" letter-spacing="-1">
+                    Corve<tspan fill="#A8D1E7">a</tspan>
+                </text>
+                <text x="150" y="105" text-anchor="middle" font-family="'Outfit', 'Inter', sans-serif" font-weight="700" font-size="12" fill="#0F2C59" letter-spacing="7">
+                    SKINCARE
+                </text>
+            </svg>
+        </div>
+    </header>
+
+    <!-- Mobile summary toggle bar -->
+    <div class="mobile-summary-toggle" id="mobile-toggle">
+        <span class="mobile-summary-toggle-text">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-shopping-cart"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+            <span id="toggle-label">Show order summary</span>
+            <span id="toggle-chevron">⌵</span>
+        </span>
+        <span class="mobile-summary-total" id="mobile-total-display">A$0.00</span>
+    </div>
+
+    <!-- Main dynamic layout layout -->
+    <main class="checkout-container">
+        <!-- Billing/Payment column -->
+        <section class="payment-section">
+            <h2 class="section-title">Payment</h2>
+
+            <!-- Error container for payment processing issues -->
+            <div class="alert-banner" id="error-banner"></div>
+
+            <!-- Whop Iframe Mounting anchor -->
+            <div id="checkout-embed-container">
+                <div class="embed-loading-overlay" id="loading-overlay">
+                    <div class="spinner"></div>
+                    <p style="color: var(--text-muted); font-size: 14px; font-weight: 500;">Securing checkout session...</p>
+                </div>
+            </div>
+
+            <!-- Customized bottom action button -->
+            <div class="custom-submit-btn-wrapper">
+                <button type="button" class="complete-btn" id="complete-purchase-btn" disabled>
+                    Complete purchase
+                </button>
+            </div>
+        </section>
+
+        <!-- Right Order Summary column -->
+        <section class="summary-section" id="summary-panel">
+            <h2 class="section-title">Order summary</h2>
+
+            <div class="cart-items-list" id="cart-item-list">
+                <!-- Items are populated dynamically -->
+            </div>
+
+            <div class="summary-totals">
+                <div class="total-row">
+                    <span>Subtotal</span>
+                    <span id="summary-subtotal">A$0.00</span>
+                </div>
+                <div class="total-row">
+                    <span>Shipping</span>
+                    <span style="font-weight: 500; color: var(--emerald-green);">Free</span>
+                </div>
+                <div class="total-row grand-total">
+                    <span>Total due today</span>
+                    <span id="summary-total">A$0.00</span>
+                </div>
+            </div>
+
+            <!-- Trial Renewal details callout -->
+            <div class="trial-callout" id="trial-callout-box" style="display: none;">
+                <div class="trial-icon">✓</div>
+                <div>
+                    <h4 class="trial-title">30-Day Journal Trial Included</h4>
+                    <p class="trial-text" id="trial-renewal-text">A$39.99/month after 30 days. Cancel easily anytime.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Error state modal overlay -->
+    <div class="error-overlay" id="validation-error-overlay">
+        <div class="error-card">
+            <div class="error-badge">⚠️</div>
+            <h2 class="error-title">Invalid Checkout Reference</h2>
+            <p class="error-text" id="validation-error-msg">
+                This checkout session has expired or is invalid. Please return to the store to rebuild your cart and try again.
+            </p>
+            <a href="https://corvea.store" class="btn-fallback">Return to Store</a>
+        </div>
+    </div>
+
+    <!-- Whop SDK event callback handles + runtime javascript -->
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const reference = urlParams.get('reference');
+        const session = urlParams.get('session');
+        const plan = urlParams.get('plan');
+
+        const payButton = document.getElementById('complete-purchase-btn');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const errorBanner = document.getElementById('error-banner');
+
+        let isSubmitting = false;
+        let fallbackTimer = null;
+
+        // Callback hooks exposed to Whop SDK's loader.js
+        window.handlePaymentError = function(err) {
+            console.error("Whop Payment Error Callback triggered:", err);
+            clearTimeout(fallbackTimer);
+            isSubmitting = false;
+            payButton.disabled = false;
+            payButton.innerHTML = 'Complete purchase';
+            
+            errorBanner.innerText = err.message || 'Payment failed. Please verify your card details.';
+            errorBanner.style.display = 'block';
+            errorBanner.scrollIntoView({ behavior: 'smooth' });
+        };
+
+        window.handleStateChange = function(state) {
+            console.log("Whop Checkout state changed:", state);
+            // Ignore status state changes while currently processing payment to prevent visual flicker
+            if (isSubmitting) return;
+
+            if (state === 'ready') {
+                payButton.disabled = false;
+                loadingOverlay.style.display = 'none';
+            } else if (state === 'loading') {
+                payButton.disabled = true;
+            } else if (state === 'disabled') {
+                payButton.disabled = true;
+            }
+        };
+
+        // Initialize script parameters & fetch summary
+        function init() {
+            const refRegex = /^ref_[a-f0-9]{32}$/;
+            const sessionRegex = /^ch_[a-zA-Z0-9]+$/;
+            const planRegex = /^plan_[a-zA-Z0-9]+$/;
+
+            if (!refRegex.test(reference) || !sessionRegex.test(session) || !planRegex.test(plan)) {
+                showErrorOverlay("This dynamic checkout session link has expired or contains missing configuration values. Please return to store and try again.");
+                return;
+            }
+
+            // Create checkout div inside dynamic anchor
+            const container = document.getElementById('checkout-embed-container');
+            const whopDiv = document.createElement('div');
+            whopDiv.id = 'whop-embedded-checkout';
+            whopDiv.setAttribute('data-whop-checkout-plan-id', plan);
+            whopDiv.setAttribute('data-whop-checkout-session', session);
+            whopDiv.setAttribute('data-whop-checkout-return-url', 'https://checkout.corvea.store/complete?reference=' + reference);
+            whopDiv.setAttribute('data-whop-checkout-hide-submit-button', 'true');
+            whopDiv.setAttribute('data-whop-checkout-on-payment-error', 'handlePaymentError');
+            whopDiv.setAttribute('data-whop-checkout-on-state-change', 'handleStateChange');
+            whopDiv.setAttribute('data-whop-checkout-theme', 'light');
+            whopDiv.setAttribute('data-whop-checkout-theme-accent-color', '#0F2C59');
+            container.appendChild(whopDiv);
+
+            // Fetch list details
+            fetchSummary(reference);
+
+            // Load Whop Script
+            const sdkScript = document.createElement('script');
+            sdkScript.src = 'https://js.whop.com/static/checkout/loader.js';
+            sdkScript.async = true;
+            sdkScript.defer = true;
+            document.head.appendChild(sdkScript);
+        }
+
+        async function fetchSummary(ref) {
+            try {
+                // Call public sanitizing endpoint to read contents from Redis
+                const response = await fetch(`/api/checkout-summary/${ref}`);
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error || "Failed to load summary payload.");
+                }
+                const summary = await response.json();
+                renderSummary(summary);
+            } catch (err) {
+                console.error("Failed to load checkout summary:", err);
+                showErrorOverlay("Unable to fetch your cart contents. The session may have expired or cannot be retrieved at this time.");
+            }
+        }
+
+        function renderSummary(data) {
+            const listEl = document.getElementById('cart-item-list');
+            listEl.innerHTML = '';
+
+            let subtotal = 0;
+
+            data.items.forEach(item => {
+                subtotal += item.final_line_price;
+
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'cart-item';
+
+                let pricingText = '';
+                if (item.free_gift) {
+                    pricingText = `<span class="free-gift-label">Free gift</span>`;
+                } else {
+                    const wasPrice = item.discount_amount > 0 ? `<span class="price-compare">A$${((item.final_line_price + item.discount_amount)).toFixed(2)}</span>` : '';
+                    pricingText = `${wasPrice}<span class="item-price">A$${item.final_line_price.toFixed(2)}</span>`;
+                }
+
+                itemDiv.innerHTML = `
+                    <div class="item-details">
+                        <span class="item-name">${item.product_title}</span>
+                        ${item.variant_title ? `<span class="item-variant">${item.variant_title}</span>` : ''}
+                        <span class="item-quantity-badge">Qty: ${item.quantity}</span>
+                    </div>
+                    <div class="item-pricing">
+                        ${pricingText}
+                    </div>
+                `;
+                listEl.appendChild(itemDiv);
+            });
+
+            // Set currency/total layout values
+            const totalCcy = (data.currency || 'aud').toUpperCase();
+            
+            document.getElementById('summary-subtotal').innerText = `${totalCcy}$${subtotal.toFixed(2)}`;
+            document.getElementById('summary-total').innerText = `${totalCcy}$${data.total.toFixed(2)}`;
+            document.getElementById('mobile-total-display').innerText = `${totalCcy}$${data.total.toFixed(2)}`;
+
+            // Handle trial callout logic
+            if (data.membership_trial_status) {
+                const callout = document.getElementById('trial-callout-box');
+                const renewalText = document.getElementById('trial-renewal-text');
+                renewalText.innerText = `${totalCcy}$${data.membership_renewal_price.toFixed(2)}/month after 30 days. Cancel easily anytime.`;
+                callout.style.display = 'flex';
+            }
+        }
+
+        function showErrorOverlay(msg) {
+            document.getElementById('validation-error-msg').innerText = msg;
+            document.getElementById('validation-error-overlay').style.display = 'flex';
+            loadingOverlay.style.display = 'none';
+        }
+
+        // Custom submit triggering logic
+        payButton.addEventListener('click', function() {
+            if (isSubmitting || !window.wco) return;
+
+            isSubmitting = true;
+            payButton.disabled = true;
+            payButton.innerHTML = `<span class="btn-spinner"></span> Completing purchase...`;
+            errorBanner.style.display = 'none';
+
+            // Safeguard re-enable timer in case of silent iframe errors
+            fallbackTimer = setTimeout(() => {
+                isSubmitting = false;
+                payButton.disabled = false;
+                payButton.innerHTML = 'Complete purchase';
+            }, 8000);
+
+            try {
+                window.wco.submit("whop-embedded-checkout");
+            } catch (err) {
+                console.error("Programmatic call to wco.submit failed:", err);
+                handlePaymentError(err);
+            }
+        });
+
+        // Mobile cart expansion toggle listener
+        const mobileToggle = document.getElementById('mobile-toggle');
+        const summaryPanel = document.getElementById('summary-panel');
+        const toggleChevron = document.getElementById('toggle-chevron');
+        const toggleLabel = document.getElementById('toggle-label');
+
+        mobileToggle.addEventListener('click', function() {
+            const isActive = summaryPanel.classList.toggle('active');
+            if (isActive) {
+                toggleChevron.innerText = '⌃';
+                toggleLabel.innerText = 'Hide order summary';
+            } else {
+                toggleChevron.innerText = '⌵';
+                toggleLabel.innerText = 'Show order summary';
+            }
+        });
+
+        // Start checking URL inputs
+        init();
+    </script>
+</body>
+</html>

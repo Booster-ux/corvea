@@ -139,14 +139,26 @@ async function createCheckout(cartPayload, customerEmail = null) {
             oneTimeCentsTotal += linePrice;
         }
 
+        const productTitle = item.product_title || item.title || '';
+        const variantTitle = item.variant_title || '';
+        const originalPrice = typeof item.original_price !== 'undefined' ? item.original_price : item.price;
+        const discountAmount = Math.max(0, (originalPrice * item.quantity) - linePrice);
+        const freeGift = unitPrice === 0 || item.final_price === 0;
+
         return {
             variant_id: item.id,
             handle: item.handle,
             title: item.title,
+            product_title: productTitle,
+            variant_title: variantTitle,
             price_cents: unitPrice,
             quantity: item.quantity,
             sku: item.sku || '',
-            is_membership: isMembership
+            is_membership: isMembership,
+            final_price: unitPrice,
+            final_line_price: linePrice,
+            discount_amount: discountAmount,
+            free_gift: freeGift
         };
     });
 
@@ -234,9 +246,24 @@ async function createCheckout(cartPayload, customerEmail = null) {
             throw new Error('Whop API response did not contain purchase_url.');
         }
 
+        const planIdMatch = purchaseUrl.match(/\/checkout\/(plan_[a-zA-Z0-9]+)/);
+        let planId = planIdMatch ? planIdMatch[1] : null;
+
+        if (!planId) {
+            planId = response.data?.plan_id ||
+                response.data?.data?.plan_id ||
+                response.data?.checkout_plans?.[0]?.id ||
+                response.data?.plans?.[0]?.id ||
+                (isMembershipInCart ? 'plan_XA564i63pBo41' : 'plan_Pj1GzRRMdZzJ9');
+        }
+
+        const sessionId = response.data?.id || response.data?.data?.id || 'ch_test_default';
+
         return {
-            purchase_url: purchaseUrl,
-            checkout_id: response.data?.id || response.data?.data?.id
+            checkout_reference: checkoutReference,
+            session_id: sessionId,
+            plan_id: planId,
+            embedded_checkout_url: `https://checkout.corvea.store/?reference=${checkoutReference}&session=${sessionId}&plan=${planId}`
         };
     } catch (error) {
         // Serialized error logging to prevent collapsing in Vercel UI

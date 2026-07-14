@@ -227,40 +227,50 @@ async function runTests() {
                     customer_email: item.email
                 });
 
-                if (res.status === 200 && res.data.purchase_url) {
+                if (res.status === 200 && res.data.embedded_checkout_url) {
                     // Extract session/checkout ID configuration
-                    const urlParsed = new URL(res.data.purchase_url);
+                    const urlParsed = new URL(res.data.embedded_checkout_url);
                     const checkoutId = urlParsed.searchParams.get('session');
+                    const checkoutRef = urlParsed.searchParams.get('reference');
 
-                    // Intercept the database entry to fetch the checkout reference
-                    let refKey = null;
-                    const store = redisService.isRedisAvailable ? {} : redisService.getInMemoryStore?.();
-                    if (store) {
-                        for (const k of Object.keys(store)) {
-                            const val = JSON.parse(store[k]);
-                            if (val.cart_token === item.cart.token) {
-                                refKey = k;
-                                break;
-                            }
-                        }
-                    }
+                    console.log(`   ✅ "${item.name}" scenario success. Upfront price: A$${item.expectedUpfront}. Linked reference: ${checkoutRef}`);
 
-                    console.log(`   ✅ "${item.name}" scenario success. Upfront price: A$${item.expectedUpfront}. Linked reference: ${refKey}`);
-
-                    if (refKey) {
-                        activeCheckouts.push({
-                            name: item.name,
-                            cart: item.cart,
-                            checkout_reference: refKey.replace('checkout:', ''),
-                            expected_total: item.expectedUpfront,
-                            email: item.email,
-                            checkout_id: checkoutId || 'ch_test_default'
-                        });
-                    }
+                    activeCheckouts.push({
+                        name: item.name,
+                        cart: item.cart,
+                        checkout_reference: checkoutRef,
+                        expected_total: item.expectedUpfront,
+                        email: item.email,
+                        checkout_id: checkoutId || 'ch_test_default'
+                    });
                 } else {
                     throw new Error(`Checkout config failed for scenario: ${item.name}`);
                 }
             }
+
+            // Test 2.5: Verify checkout summary API endpoint outputs clean, formatted, and sanitized items
+            console.log('\nTest 2.5: Verifying GET /api/checkout-summary/:checkout_reference for sanitized display properties...');
+            for (const ch of activeCheckouts) {
+                const summaryRes = await axios.get(`http://localhost:${PORT}/api/checkout-summary/${ch.checkout_reference}`);
+                if (summaryRes.status !== 200) {
+                    throw new Error(`Failed to load summary for ${ch.name}`);
+                }
+                const summary = summaryRes.data;
+                console.log(`   Summary sanitization for "${ch.name}": currency=${summary.currency}, total=${summary.total}, items_count=${summary.items.length}, trial_status=${summary.membership_trial_status}`);
+
+                // Key assertions
+                if (!summary.items || !Array.isArray(summary.items)) throw new Error('Summary items missing or not array.');
+                if (summary.total !== ch.expected_total) throw new Error(`Summary total (${summary.total}) does not match expected (${ch.expected_total})`);
+                if (summary.currency !== 'aud') throw new Error('Incorrect currency returned.');
+                if (ch.name.includes('membership') && !summary.membership_trial_status) throw new Error('Membership trial status not set appropriately.');
+
+                // Expose no credentials assertion
+                const keys = Object.keys(summary);
+                if (keys.includes('cart_token') || keys.includes('apiKey') || keys.includes('webhookSecret')) {
+                    throw new Error('Credential leakage detected in checkout summary endpoint response.');
+                }
+            }
+            console.log('   ✅ All summary responses verified secure.');
 
             // Test 3: Process the simulated webhooks based on the created checkouts
             console.log('\nTest 3: Testing webhook handlers and verification logic...');

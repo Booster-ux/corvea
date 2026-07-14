@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Complete | Corvea</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --navy-primary: #0F2C59;
+            --navy-hover: #0a1f3f;
+            --blue-accent: #A8D1E7;
+            --emerald-green: #10B981;
+            --emerald-bg: #ECFDF5;
+            --emerald-border: #A7F3D0;
+            --text-dark: #1E293B;
+            --text-muted: #64748B;
+            --border-color: #E2E8F0;
+            --transition-smooth: all 0.2s ease-in-out;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            color: var(--text-dark);
+            background-color: #F8FAFC;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        header {
+            width: 100%;
+            padding: 24px 0;
+            border-bottom: 1px solid var(--border-color);
+            background: #FFFFFF;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .success-wrapper {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 40px 24px;
+        }
+
+        .success-card {
+            max-width: 520px;
+            width: 100%;
+            background: #FFFFFF;
+            border-radius: 12px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(0, 0, 0, 0.05);
+            padding: 40px 32px;
+            text-align: center;
+        }
+
+        .checkmark-container {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background-color: var(--emerald-bg);
+            border: 2px solid var(--emerald-border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+        }
+
+        .checkmark-icon {
+            font-size: 40px;
+            color: var(--emerald-green);
+            line-height: 1;
+            font-weight: bold;
+        }
+
+        .success-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 26px;
+            color: var(--navy-primary);
+            margin-bottom: 12px;
+            font-weight: 700;
+        }
+
+        .thank-you-sub {
+            font-size: 16px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+
+        .processing-box {
+            background-color: #F8FAFC;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 32px;
+            text-align: left;
+        }
+
+        .processing-row {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .bullet-dot {
+            color: var(--navy-primary);
+            font-size: 18px;
+            line-height: 1;
+        }
+
+        .processing-details h4 {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--navy-primary);
+            margin-bottom: 4px;
+        }
+
+        .processing-details p {
+            font-size: 13px;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        .return-btn {
+            display: inline-block;
+            width: 100%;
+            font-family: 'Outfit', sans-serif;
+            font-size: 16px;
+            font-weight: 600;
+            text-decoration: none;
+            background-color: var(--navy-primary);
+            color: #FFFFFF;
+            border: none;
+            border-radius: 8px;
+            padding: 16px 24px;
+            transition: var(--transition-smooth);
+            cursor: pointer;
+        }
+
+        .return-btn:hover {
+            background-color: var(--navy-hover);
+            box-shadow: 0 4px 12px rgba(15, 44, 89, 0.2);
+        }
+
+        footer {
+            padding: 24px;
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-muted);
+            border-top: 1px solid var(--border-color);
+            background: #FFFFFF;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div class="corvea-logo">
+            <svg viewBox="0 0 300 130" xmlns="http://www.w3.org/2000/svg" style="width: 156px; height: auto;">
+                <text x="150" y="70" text-anchor="middle" font-family="'Outfit', 'Inter', sans-serif" font-weight="600"
+                    font-size="52" fill="#0F2C59" letter-spacing="-1">
+                    Corve<tspan fill="#A8D1E7">a</tspan>
+                </text>
+                <text x="150" y="105" text-anchor="middle" font-family="'Outfit', 'Inter', sans-serif" font-weight="700"
+                    font-size="12" fill="#0F2C59" letter-spacing="7">
+                    SKINCARE
+                </text>
+            </svg>
+        </div>
+    </header>
+
+    <div class="success-wrapper">
+        <div class="success-card">
+            <div class="checkmark-container">
+                <div class="checkmark-icon">✓</div>
+            </div>
+
+            <h1 class="success-title">Payment successful</h1>
+            <p class="thank-you-sub">Thank you for shopping with Corvea!</p>
+
+            <div class="processing-box">
+                <div class="processing-row">
+                    <div class="bullet-dot">✉</div>
+                    <div class="processing-details">
+                        <h4>Order is processing</h4>
+                        <p>We are finishing your order details. A confirmation email with receipt and delivery notes
+                            will be sent shortly.</p>
+                    </div>
+                </div>
+            </div>
+
+            <a href="https://corvea.store" class="return-btn">Return to store</a>
+        </div>
+    </div>
+
+    <footer>
+        &copy; 2026 Corvea. All rights reserved. Secure transactions powered by Whop.
+    </footer>
+
+</body>
+
+</html>

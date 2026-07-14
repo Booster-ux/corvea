@@ -101,19 +101,19 @@ Whop is natively designed for single-product digital checkout configurations (on
 
 ## 4. Shopify Theme Integration (Shrine Theme)
 
-To redirect customers from the checkout buttons of your Shopify store to Whop, install the client-side script in your **Shrine** theme:
+To redirect customers from the checkout buttons of your Shopify store to your branded embedded checkout page, install the client-side script in your **Shrine** theme:
 
 1. In your Shopify Admin, go to **Online Store** > **Themes**.
 2. Locate your **Shrine** theme, click the three dots (`...`), and select **Edit code**.
-3. Locate layout/theme.liquid (for global site coverage) or sections/main-cart.liquid (specifically for the cart page).
+3. Locate `layout/theme.liquid` (for global site coverage) or `sections/main-cart.liquid` (specifically for the cart page).
 4. Scroll to the bottom of the file (before the closing `</body>` tag) and paste the following snippet:
 
 ```html
 <!-- Whop Checkout Interceptor Script -->
 <script>
 (function() {
-  // Replace this with your production Vercel URL
-  const API_ENDPOINT = 'https://your-vercel-project.vercel.app/api/create-checkout';
+  // Point to your production Vercel gateway instance API
+  const API_ENDPOINT = 'https://corvea.vercel.app/api/create-checkout';
 
   const CHECKOUT_SELECTORS = [
     'button[name="checkout"]',
@@ -194,17 +194,17 @@ To redirect customers from the checkout buttons of your Shopify store to Whop, i
       }
 
       const session = await checkoutResponse.json();
-      if (session.purchase_url) {
-        window.location.href = session.purchase_url;
+      if (session.embedded_checkout_url) {
+        // Redirect client to custom subdomain embedded checkout page
+        window.location.href = session.embedded_checkout_url;
       } else {
-        throw new Error('No purchase_url returned from API.');
+        throw new Error('No embedded_checkout_url returned from API.');
       }
     } catch (error) {
-      console.error('[Whop Integration] Error:', error.message);
-      alert('We are experiencing payment gateway connections. Redirecting you to checkout...');
+      console.error('[Whop Integration] Error:', error.message || error);
+      alert('[Checkout Error] ' + (error.message || 'An unexpected error occurred during secure checkout generation.'));
       isRedirecting = false;
       setLoadingState(buttonElement, false, originalText);
-      window.location.href = '/checkout';
     }
   }
 
@@ -235,13 +235,51 @@ To redirect customers from the checkout buttons of your Shopify store to Whop, i
 
 ---
 
-## 5. Local Mock Testing
+## 5. Subdomain & Embedded Checkout Setup Requirements (Custom Domain Readiness)
+
+This integration is hosted on:
+- Production checkout URL: `https://checkout.corvea.store`
+
+### A. Vercel Custom-Domain Setup
+1. In your **Vercel Dashboard**, open your project settings.
+2. Navigate to **Domains**.
+3. Under **Add Domain**, enter: `checkout.corvea.store`
+4. Assign it to redirect or resolve directly (pointing to clean deployments).
+
+### B. DNS configuration
+Set up the following record on your DNS Registrar (e.g. GoDaddy, Namecheap, Cloudflare) for the `corvea.store` zone:
+
+| Type | Name | Value | TTL |
+| :--- | :--- | :--- | :--- |
+| `CNAME` | `checkout` | `cname.vercel-dns.com` | `Automatic` or `3600` |
+
+### C. Whop Dashboard Configuration
+To allow client-side payment frame initialization on your custom domain layout:
+1. Navigate to **Whop Dashboard** > **Developer settings** > **Payments** or **Developer Playground**.
+2. Locate the Whop Embedded Checkout domains registry.
+3. Whitelist: `checkout.corvea.store` (this allows the parent window to host the iframe loader dynamically).
+
+### D. Apple Pay Domain Verification (If Applicable)
+To support Apple Pay express checkouts inside the embedded iframe:
+1. Download the domain association file (under name `apple-developer-merchantid-domain-association`) from the **Whop / Stripe Dashboard Settings**.
+2. Place this file inside your project filesystem in the `public/.well-known/` directory:
+   `public/.well-known/apple-developer-merchantid-domain-association`
+3. Vercel will automatically serve it statically under path:
+   `https://checkout.corvea.store/.well-known/apple-developer-merchantid-domain-association`
+4. Proceed to click "Verify Domain" inside the Whop checkout/payments portal.
+
+---
+
+## 6. Local Mock Testing
+
 Execute script:
 ```bash
 node test-run.js
 ```
+
 This runs the integration test suite, demonstrating:
 - Multiple checkout scenarios (membership only, physical items, large discounts, zero-priced free gift, bundle items).
+- Sanitized Checkout summary serialization: `GET /api/checkout-summary/:checkout_reference` endpoint returning only display fields and checking credentials protection.
 - Webhook signature verification and idempotency check.
 - Redis database mapping state storage/retrieval.
 - Controlled rejection of invalid/expired checkouts.

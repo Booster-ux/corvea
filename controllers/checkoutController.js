@@ -1,4 +1,8 @@
 const whopService = require('../services/whopService');
+const redisService = require('../services/redisService');
+
+// In-memory rate limiting map for the public summary endpoint
+const ipRequests = new Map();
 
 /**
  * Endpoint: POST /api/create-checkout
@@ -18,7 +22,7 @@ async function handleCreateCheckout(req, res) {
 
     try {
         const result = await whopService.createCheckout(cart, customer_email);
-        console.log(`Generated Whop Checkout: ${result.purchase_url} for cart`);
+        console.log(`Generated Whop Checkout: ${result.embedded_checkout_url} for cart`);
         return res.status(200).json(result);
     } catch (error) {
         console.error('Checkout creation controller error:', error);
@@ -26,6 +30,69 @@ async function handleCreateCheckout(req, res) {
     }
 }
 
+/**
+ * Endpoint: GET /api/checkout-summary/:checkout_reference
+ * Retrieves the stored Redis cart and returns only sanitized display data.
+ */
+async function handleCheckoutSummary(req, res) {
+    const { checkout_reference } = req.params;
+
+    // Validate checkout_reference format to prevent arbitrary Redis-key access
+    const referenceRegex = /^ref_[a-f0-9]{32}$/;
+    if (!checkout_reference || !referenceRegex.test(checkout_reference)) {
+        return res.status(400).json({ error: 'Invalid checkout reference format.' });
+    }
+
+    // Direct simple rate limiting per client IP
+    const ip = req.headers['x-forwarding-for'] || req.socket.remoteAddress || 'unknown';
+    const now = Date.now();
+    const windowMs = 60 * 1000; // 1 minute
+    const maxRequests = 60; // 60 requests per minute
+
+    let userRequests = ipRequests.get(ip) || [];
+    userRequests = userRequests.filter(timestamp => now - timestamp < windowMs);
+    if (userRequests.length >= maxRequests) {
+        return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+    }
+    userRequests.push(now);
+    ipRequests.set(ip, userRequests);
+
+    try {
+        const redisKey = `checkout:${checkout_reference}`;
+        const storedCart = await redisService.get(redisKey);
+
+        if (!storedCart) {
+            return res.status(404).json({ error: 'Checkout session has expired or does not exist.' });
+        }
+
+        // Return only sanitized display data
+        const items = (storedCart.items || []).map(item => ({
+            product_title: item.product_title || item.title || '',
+            variant_title: item.variant_title || '',
+            quantity: parseInt(item.quantity, 10),
+            final_unit_price: parseFloat((item.price_cents / 100).toFixed(2)),
+            final_line_price: parseFloat((item.final_line_price / 100).toFixed(2)),
+            discount_amount: parseFloat((item.discount_amount / 100).toFixed(2)),
+            free_gift: !!item.free_gift
+        }));
+
+        const isMembershipSelected = !!storedCart.membership_selected;
+
+        return res.status(200).json({
+            items,
+            currency: storedCart.currency || 'aud',
+            total: parseFloat(storedCart.expected_total),
+            membership_trial_status: isMembershipSelected,
+            membership_renewal_price: isMembershipSelected ? 39.99 : 0.00,
+            item_count: parseInt(storedCart.item_count, 10)
+        });
+    } catch (error) {
+        console.error('Checkout summary controller error:', error);
+        return res.status(500).json({ error: 'Failed to retrieve checkout summary.' });
+    }
+}
+
 module.exports = {
-    handleCreateCheckout
+    handleCreateCheckout,
+    handleCheckoutSummary
 };

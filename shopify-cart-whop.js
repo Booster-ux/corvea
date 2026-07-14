@@ -115,23 +115,20 @@
 
             const session = await checkoutResponse.json();
 
-            if (session.purchase_url) {
-                console.log('[Whop Integration] Redirecting to Whop payment gateway URL:', session.purchase_url);
-                window.location.href = session.purchase_url;
+            if (session.embedded_checkout_url) {
+                console.log('[Whop Integration] Redirecting to embedded checkout URL:', session.embedded_checkout_url);
+                window.location.href = session.embedded_checkout_url;
             } else {
-                throw new Error('No purchase_url returned from API.');
+                throw new Error('No embedded_checkout_url returned from API.');
             }
 
         } catch (error) {
-            console.error('[Whop Integration] Integration Error:', error.message);
+            console.error('[Whop Integration] Integration Error:', error.message || error);
 
-            // Fallback: Notify customer & log, but allow proceeding to standard checkout if critical
-            alert('We are experiencing payment gateway connections. Redirecting you to checkout...');
+            // Output full debug alert to support diagnostics during QA
+            alert('[Checkout Error] ' + (error.message || 'An unexpected error occurred during secure checkout generation.'));
             isRedirecting = false;
             setLoadingState(buttonElement, false, originalText);
-
-            // Default to Shopify checkout if api fails
-            window.location.href = '/checkout';
         }
     }
 

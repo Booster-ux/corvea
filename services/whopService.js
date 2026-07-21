@@ -223,11 +223,6 @@ async function createCheckout(cartPayload, customerEmail = null) {
     };
 
     try {
-        // Store full map details server side under Redis with 24 hours TTL expiration
-        const redisKey = `checkout:${checkoutReference}`;
-        await redisService.set(redisKey, cartRecord, 86400);
-
-        console.log(`[Whop Checkout] Stored checkout details to Redis, Key: ${redisKey}`);
         console.log(`[Whop Checkout] Creating checkout configuration for plan type: ${planPayload.plan_type}...`);
 
         const response = await axios.post(
@@ -258,6 +253,14 @@ async function createCheckout(cartPayload, customerEmail = null) {
         }
 
         const sessionId = response.data?.id || response.data?.data?.id || 'ch_test_default';
+
+        // Store full map details server side under Redis with 24 hours TTL expiration
+        const redisKey = `checkout:${checkoutReference}`;
+        cartRecord.session_id = sessionId;
+        cartRecord.plan_id = planId;
+        await redisService.set(redisKey, cartRecord, 86400);
+
+        console.log(`[Whop Checkout] Stored checkout details to Redis, Key: ${redisKey}`);
 
         return {
             checkout_reference: checkoutReference,

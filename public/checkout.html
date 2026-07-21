@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,7 +8,9 @@
     <!-- Premium Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
     <style>
         :root {
             --navy-primary: #0F2C59;
@@ -120,7 +123,9 @@
         }
 
         @keyframes spin {
-            to { transform: rotate(360deg); }
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         /* Custom Button Style */
@@ -413,7 +418,8 @@
                 padding: 20px;
                 border-bottom: 1px solid var(--border-color);
                 background-color: #FFFFFF;
-                display: none; /* Controlled dynamically on mobile */
+                display: none;
+                /* Controlled dynamically on mobile */
                 order: 1;
             }
 
@@ -423,16 +429,19 @@
         }
     </style>
 </head>
+
 <body>
 
     <!-- Header containing the branded logo -->
     <header>
         <div class="corvea-logo">
             <svg viewBox="0 0 300 130" xmlns="http://www.w3.org/2000/svg" style="width: 156px; height: auto;">
-                <text x="150" y="70" text-anchor="middle" font-family="'Outfit', 'Inter', sans-serif" font-weight="600" font-size="52" fill="#0F2C59" letter-spacing="-1">
+                <text x="150" y="70" text-anchor="middle" font-family="'Outfit', 'Inter', sans-serif" font-weight="600"
+                    font-size="52" fill="#0F2C59" letter-spacing="-1">
                     Corve<tspan fill="#A8D1E7">a</tspan>
                 </text>
-                <text x="150" y="105" text-anchor="middle" font-family="'Outfit', 'Inter', sans-serif" font-weight="700" font-size="12" fill="#0F2C59" letter-spacing="7">
+                <text x="150" y="105" text-anchor="middle" font-family="'Outfit', 'Inter', sans-serif" font-weight="700"
+                    font-size="12" fill="#0F2C59" letter-spacing="7">
                     SKINCARE
                 </text>
             </svg>
@@ -442,7 +451,12 @@
     <!-- Mobile summary toggle bar -->
     <div class="mobile-summary-toggle" id="mobile-toggle">
         <span class="mobile-summary-toggle-text">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-shopping-cart"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round" class="feather feather-shopping-cart">
+                <circle cx="9" cy="21" r="1"></circle>
+                <circle cx="20" cy="21" r="1"></circle>
+                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+            </svg>
             <span id="toggle-label">Show order summary</span>
             <span id="toggle-chevron">⌵</span>
         </span>
@@ -462,7 +476,8 @@
             <div id="checkout-embed-container">
                 <div class="embed-loading-overlay" id="loading-overlay">
                     <div class="spinner"></div>
-                    <p style="color: var(--text-muted); font-size: 14px; font-weight: 500;">Securing checkout session...</p>
+                    <p style="color: var(--text-muted); font-size: 14px; font-weight: 500;">Securing checkout session...
+                    </p>
                 </div>
             </div>
 
@@ -502,7 +517,8 @@
                 <div class="trial-icon">✓</div>
                 <div>
                     <h4 class="trial-title">30-Day Journal Trial Included</h4>
-                    <p class="trial-text" id="trial-renewal-text">A$39.99/month after 30 days. Cancel easily anytime.</p>
+                    <p class="trial-text" id="trial-renewal-text">A$39.99/month after 30 days. Cancel easily anytime.
+                    </p>
                 </div>
             </div>
         </section>
@@ -514,7 +530,8 @@
             <div class="error-badge">⚠️</div>
             <h2 class="error-title">Invalid Checkout Reference</h2>
             <p class="error-text" id="validation-error-msg">
-                This checkout session has expired or is invalid. Please return to the store to rebuild your cart and try again.
+                This checkout session has expired or is invalid. Please return to the store to rebuild your cart and try
+                again.
             </p>
             <a href="https://corvea.store" class="btn-fallback">Return to Store</a>
         </div>
@@ -523,9 +540,9 @@
     <!-- Whop SDK event callback handles + runtime javascript -->
     <script>
         const urlParams = new URLSearchParams(window.location.search);
-        const reference = urlParams.get('reference');
-        const session = urlParams.get('session');
-        const plan = urlParams.get('plan');
+        const reference = urlParams.get('reference') || urlParams.get('checkout_reference');
+        let session = urlParams.get('session');
+        let plan = urlParams.get('plan');
 
         const payButton = document.getElementById('complete-purchase-btn');
         const loadingOverlay = document.getElementById('loading-overlay');
@@ -533,21 +550,22 @@
 
         let isSubmitting = false;
         let fallbackTimer = null;
+        let whopInitialized = false;
 
         // Callback hooks exposed to Whop SDK's loader.js
-        window.handlePaymentError = function(err) {
+        window.handlePaymentError = function (err) {
             console.error("Whop Payment Error Callback triggered:", err);
             clearTimeout(fallbackTimer);
             isSubmitting = false;
             payButton.disabled = false;
             payButton.innerHTML = 'Complete purchase';
-            
+
             errorBanner.innerText = err.message || 'Payment failed. Please verify your card details.';
             errorBanner.style.display = 'block';
             errorBanner.scrollIntoView({ behavior: 'smooth' });
         };
 
-        window.handleStateChange = function(state) {
+        window.handleStateChange = function (state) {
             console.log("Whop Checkout state changed:", state);
             // Ignore status state changes while currently processing payment to prevent visual flicker
             if (isSubmitting) return;
@@ -562,13 +580,15 @@
             }
         };
 
-        // Initialize script parameters & fetch summary
-        function init() {
-            const refRegex = /^ref_[a-f0-9]{32}$/;
-            const sessionRegex = /^ch_[a-zA-Z0-9]+$/;
-            const planRegex = /^plan_[a-zA-Z0-9]+$/;
+        function mountWhopEmbed(finalSession, finalPlan, finalReference) {
+            if (whopInitialized) return;
+            whopInitialized = true;
 
-            if (!refRegex.test(reference) || !sessionRegex.test(session) || !planRegex.test(plan)) {
+            const refRegex = /^ref_[a-f0-9]{32}$/;
+            const sessionRegex = /^ch_[a-zA-Z0-9_]+$/;
+            const planRegex = /^plan_[a-zA-Z0-9_]+$/;
+
+            if (!refRegex.test(finalReference) || !sessionRegex.test(finalSession) || !planRegex.test(finalPlan)) {
                 showErrorOverlay("This dynamic checkout session link has expired or contains missing configuration values. Please return to store and try again.");
                 return;
             }
@@ -577,9 +597,9 @@
             const container = document.getElementById('checkout-embed-container');
             const whopDiv = document.createElement('div');
             whopDiv.id = 'whop-embedded-checkout';
-            whopDiv.setAttribute('data-whop-checkout-plan-id', plan);
-            whopDiv.setAttribute('data-whop-checkout-session', session);
-            whopDiv.setAttribute('data-whop-checkout-return-url', 'https://checkout.corvea.store/complete?reference=' + reference);
+            whopDiv.setAttribute('data-whop-checkout-plan-id', finalPlan);
+            whopDiv.setAttribute('data-whop-checkout-session', finalSession);
+            whopDiv.setAttribute('data-whop-checkout-return-url', 'https://checkout.corvea.store/complete?reference=' + finalReference);
             whopDiv.setAttribute('data-whop-checkout-hide-submit-button', 'true');
             whopDiv.setAttribute('data-whop-checkout-on-payment-error', 'handlePaymentError');
             whopDiv.setAttribute('data-whop-checkout-on-state-change', 'handleStateChange');
@@ -587,15 +607,25 @@
             whopDiv.setAttribute('data-whop-checkout-theme-accent-color', '#0F2C59');
             container.appendChild(whopDiv);
 
-            // Fetch list details
-            fetchSummary(reference);
-
             // Load Whop Script
             const sdkScript = document.createElement('script');
             sdkScript.src = 'https://js.whop.com/static/checkout/loader.js';
             sdkScript.async = true;
             sdkScript.defer = true;
             document.head.appendChild(sdkScript);
+        }
+
+        // Initialize script parameters & fetch summary
+        function init() {
+            const refRegex = /^ref_[a-f0-9]{32}$/;
+
+            if (!refRegex.test(reference)) {
+                showErrorOverlay("This dynamic checkout session link has expired or contains missing configuration values. Please return to store and try again.");
+                return;
+            }
+
+            // Fetch list details
+            fetchSummary(reference);
         }
 
         async function fetchSummary(ref) {
@@ -608,6 +638,11 @@
                 }
                 const summary = await response.json();
                 renderSummary(summary);
+
+                // Mount Whop embed using parameters either from URL (legacy) or summary response
+                const finalSession = session || summary.session_id;
+                const finalPlan = plan || summary.plan_id;
+                mountWhopEmbed(finalSession, finalPlan, ref);
             } catch (err) {
                 console.error("Failed to load checkout summary:", err);
                 showErrorOverlay("Unable to fetch your cart contents. The session may have expired or cannot be retrieved at this time.");
@@ -649,7 +684,7 @@
 
             // Set currency/total layout values
             const totalCcy = (data.currency || 'aud').toUpperCase();
-            
+
             document.getElementById('summary-subtotal').innerText = `${totalCcy}$${subtotal.toFixed(2)}`;
             document.getElementById('summary-total').innerText = `${totalCcy}$${data.total.toFixed(2)}`;
             document.getElementById('mobile-total-display').innerText = `${totalCcy}$${data.total.toFixed(2)}`;
@@ -670,7 +705,7 @@
         }
 
         // Custom submit triggering logic
-        payButton.addEventListener('click', function() {
+        payButton.addEventListener('click', function () {
             if (isSubmitting || !window.wco) return;
 
             isSubmitting = true;
@@ -699,7 +734,7 @@
         const toggleChevron = document.getElementById('toggle-chevron');
         const toggleLabel = document.getElementById('toggle-label');
 
-        mobileToggle.addEventListener('click', function() {
+        mobileToggle.addEventListener('click', function () {
             const isActive = summaryPanel.classList.toggle('active');
             if (isActive) {
                 toggleChevron.innerText = '⌃';
@@ -714,4 +749,5 @@
         init();
     </script>
 </body>
+
 </html>

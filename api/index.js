@@ -30,8 +30,8 @@ app.use('/.well-known', express.static(path.join(__dirname, '../public/.well-kno
 
 // API Endpoints
 app.get('/', (req, res) => {
-    const { reference, session, plan } = req.query;
-    if (reference || session || plan) {
+    const { reference, session, plan, checkout_reference } = req.query;
+    if (reference || session || plan || checkout_reference) {
         return res.sendFile(path.join(__dirname, '../public/checkout.html'));
     }
     res.status(200).send('Shopify-Whop Checkout Integration Gateway is running.');

@@ -113,13 +113,13 @@
                 throw new Error(errPayload.error || 'Failed to construct Whop payment session.');
             }
 
-            const session = await checkoutResponse.json();
+            const data = await checkoutResponse.json();
 
-            if (session.embedded_checkout_url) {
-                console.log('[Whop Integration] Redirecting to embedded checkout URL:', session.embedded_checkout_url);
-                window.location.href = session.embedded_checkout_url;
+            if (data.checkout_url) {
+                console.log('[Whop Integration] Redirecting to checkout URL:', data.checkout_url);
+                window.location.href = data.checkout_url;
             } else {
-                throw new Error('No embedded_checkout_url returned from API.');
+                throw new Error('No checkout_url returned from API.');
             }
 
         } catch (error) {

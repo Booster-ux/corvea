@@ -227,11 +227,10 @@ async function runTests() {
                     customer_email: item.email
                 });
 
-                if (res.status === 200 && res.data.embedded_checkout_url) {
+                if (res.status === 200 && res.data.checkout_url) {
                     // Extract session/checkout ID configuration
-                    const urlParsed = new URL(res.data.embedded_checkout_url);
-                    const checkoutId = urlParsed.searchParams.get('session');
-                    const checkoutRef = urlParsed.searchParams.get('reference');
+                    const urlParsed = new URL(res.data.checkout_url);
+                    const checkoutRef = urlParsed.searchParams.get('checkout_reference');
 
                     console.log(`   ✅ "${item.name}" scenario success. Upfront price: A$${item.expectedUpfront}. Linked reference: ${checkoutRef}`);
 
@@ -241,7 +240,7 @@ async function runTests() {
                         checkout_reference: checkoutRef,
                         expected_total: item.expectedUpfront,
                         email: item.email,
-                        checkout_id: checkoutId || 'ch_test_default'
+                        checkout_id: 'ch_test_default'
                     });
                 } else {
                     throw new Error(`Checkout config failed for scenario: ${item.name}`);

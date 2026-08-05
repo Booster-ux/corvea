@@ -427,6 +427,24 @@
                 display: block;
             }
         }
+
+        .checkout-tos-text {
+            margin-top: 16px;
+            text-align: center;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .checkout-tos-text a {
+            color: var(--navy-primary);
+            text-decoration: underline;
+            font-weight: 500;
+            transition: var(--transition-smooth);
+        }
+
+        .checkout-tos-text a:hover {
+            color: var(--navy-hover);
+        }
     </style>
 </head>
 
@@ -487,6 +505,12 @@
                     Complete purchase
                 </button>
             </div>
+
+            <!-- Customized Terms of Service Footer Link -->
+            <div class="checkout-tos-text">
+                By completing your purchase, you agree to our
+                <a href="#" target="_blank" id="checkout-tos-link">Terms and Conditions</a>.
+            </div>
         </section>
 
         <!-- Right Order Summary column -->
@@ -509,16 +533,6 @@
                 <div class="total-row grand-total">
                     <span>Total due today</span>
                     <span id="summary-total">A$0.00</span>
-                </div>
-            </div>
-
-            <!-- Trial Renewal details callout -->
-            <div class="trial-callout" id="trial-callout-box" style="display: none;">
-                <div class="trial-icon">✓</div>
-                <div>
-                    <h4 class="trial-title">30-Day Journal Trial Included</h4>
-                    <p class="trial-text" id="trial-renewal-text">A$39.99/month after 30 days. Cancel easily anytime.
-                    </p>
                 </div>
             </div>
         </section>
@@ -601,6 +615,7 @@
             whopDiv.setAttribute('data-whop-checkout-session', finalSession);
             whopDiv.setAttribute('data-whop-checkout-return-url', 'https://checkout.corvea.store/complete?reference=' + finalReference);
             whopDiv.setAttribute('data-whop-checkout-hide-submit-button', 'true');
+            whopDiv.setAttribute('data-whop-checkout-hide-tos', 'true');
             whopDiv.setAttribute('data-whop-checkout-on-payment-error', 'handlePaymentError');
             whopDiv.setAttribute('data-whop-checkout-on-state-change', 'handleStateChange');
             whopDiv.setAttribute('data-whop-checkout-theme', 'light');
@@ -690,12 +705,7 @@
             document.getElementById('mobile-total-display').innerText = `${totalCcy}$${data.total.toFixed(2)}`;
 
             // Handle trial callout logic
-            if (data.membership_trial_status) {
-                const callout = document.getElementById('trial-callout-box');
-                const renewalText = document.getElementById('trial-renewal-text');
-                renewalText.innerText = `${totalCcy}$${data.membership_renewal_price.toFixed(2)}/month after 30 days. Cancel easily anytime.`;
-                callout.style.display = 'flex';
-            }
+            // Trial details UI displays removed as per client request.
         }
 
         function showErrorOverlay(msg) {

@@ -509,7 +509,8 @@
             <!-- Customized Terms of Service Footer Link -->
             <div class="checkout-tos-text">
                 By completing your purchase, you agree to our
-                <a href="#" target="_blank" id="checkout-tos-link">Terms and Conditions</a>.
+                <a href="https://corvea.store/policies/terms-of-service" target="_blank" id="checkout-tos-link">Terms
+                    and Conditions</a>.
             </div>
         </section>
 
@@ -616,6 +617,7 @@
             whopDiv.setAttribute('data-whop-checkout-return-url', 'https://checkout.corvea.store/complete?reference=' + finalReference);
             whopDiv.setAttribute('data-whop-checkout-hide-submit-button', 'true');
             whopDiv.setAttribute('data-whop-checkout-hide-tos', 'true');
+            whopDiv.setAttribute('data-whop-checkout-hide-price', 'true');
             whopDiv.setAttribute('data-whop-checkout-on-payment-error', 'handlePaymentError');
             whopDiv.setAttribute('data-whop-checkout-on-state-change', 'handleStateChange');
             whopDiv.setAttribute('data-whop-checkout-theme', 'light');
